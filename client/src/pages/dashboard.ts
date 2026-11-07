@@ -42,6 +42,7 @@ async function load() {
     <div class="card">
       <div class="slot-head"><h3 style="margin:0">🍽️ وجبات النهارده</h3><a class="btn sm" href="/meals.html">كل الاختيارات ←</a></div>
       <div class="grid-3">${d.plan.map(todayMeal).join('')}</div>
+      <p class="small muted" style="margin-top:10px">☕ مشروب الصبح: <span style="color:var(--waleed)">وليد ${drinkName(d.drinks?.waleed)}</span> · <span style="color:var(--doaa)">دعاء ${drinkName(d.drinks?.doaa)}</span> — <a href="/meals.html" style="color:var(--lime)">غيّر</a></p>
     </div>`;
 
   const cs = getComputedStyle(document.documentElement);
@@ -93,6 +94,8 @@ function personCard(p: any) {
     <div class="bar-row"><div class="lbl"><span>😴 النوم</span><span>${sleep ? `${sleep.hours} ساعة (${sleep.bed_time} ← ${sleep.wake_time})` : '<a href="/log.html" class="muted">سجّل نومك</a>'}</span></div></div>
   </div>`;
 }
+
+function drinkName(c?: string) { return c === 'coffee' ? 'قهوة بالحليب' : c === 'tea' ? 'شاي بالحليب' : 'ولا حاجة'; }
 
 function todayMeal(p: any) {
   const o = p.chosenIndex != null ? p.options[p.chosenIndex] : null;

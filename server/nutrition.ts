@@ -1,12 +1,12 @@
 import { sqlite } from './db.js';
 import { todayKW, daysBetween, addDays } from './time.js';
-import type { MealOption, PersonPortion, ProfileId, Slot } from '../shared/types.js';
-import { SLOT_SHARE } from '../shared/types.js';
+import type { MealOption, PersonPortion, ProfileId, Slot, DrinkCode } from '../shared/types.js';
+import { SLOT_SHARE, DRINKS } from '../shared/types.js';
 
 export interface ProfileRow {
   id: ProfileId; name: string; sex: 'male' | 'female'; birth_date: string; height_cm: number;
   start_weight: number; start_date: string; goal_weight: number; activity_factor: number;
-  body_fat_pct: number | null; water_goal_ml: number; color: string; avoid_chicken: number;
+  body_fat_pct: number | null; water_goal_ml: number; color: string; avoid_chicken: number; avoid_eggs: number;
 }
 
 export function getProfiles(): ProfileRow[] {
@@ -75,13 +75,24 @@ export function targetsFor(p: ProfileRow): Targets {
 
 const round5 = (n: number) => Math.max(5, Math.round(n / 5) * 5);
 
-/** يحسب كمية كل شخص من الوجبة حسب سعراته */
-export function portionFor(opt: MealOption, p: ProfileRow, slot: Slot): PersonPortion {
+export function drinkOf(id: string, date: string): DrinkCode {
+  const r = sqlite.prepare('SELECT drink FROM drinks WHERE profile_id=? AND date=?').get(id, date) as { drink: DrinkCode } | undefined;
+  return r?.drink ?? 'none';
+}
+export function setDrink(id: string, date: string, drink: DrinkCode) {
+  sqlite.prepare('INSERT INTO drinks(profile_id,date,drink) VALUES (?,?,?) ON CONFLICT(profile_id,date) DO UPDATE SET drink=excluded.drink').run(id, date, drink);
+}
+
+/** يحسب كمية كل شخص من الوجبة حسب سعراته (ومشروب الصبح بيتخصم من الفطار) */
+export function portionFor(opt: MealOption, p: ProfileRow, slot: Slot, date?: string): PersonPortion {
   const t = targetsFor(p);
-  const mealKcal = t.kcal * SLOT_SHARE[slot];
+  const drink = slot === 'breakfast' && date ? drinkOf(p.id, date) : 'none';
+  const drinkKcal = drink !== 'none' ? DRINKS[drink].kcal : 0;
+  const mealKcal = t.kcal * SLOT_SHARE[slot] - drinkKcal;
   const scale = mealKcal / opt.baseKcal;
   const lines = opt.ingredients.map((ing) => {
-    const useAlt = p.avoid_chicken && ing.doaaAlt;
+    const avoid = (ing.altFor ?? 'chicken') === 'egg' ? p.avoid_eggs : p.avoid_chicken;
+    const useAlt = avoid && ing.doaaAlt;
     const name = useAlt ? ing.doaaAlt!.name : ing.name;
     const grams = useAlt ? ing.doaaAlt!.grams : ing.grams;
     return { name, grams: grams > 0 ? round5(grams * scale) : 0 };

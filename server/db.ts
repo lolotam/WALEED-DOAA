@@ -104,12 +104,16 @@ CREATE TABLE IF NOT EXISTS meal_plans (
   eaten INTEGER NOT NULL DEFAULT 0, UNIQUE(date, slot));
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS drinks (
+  profile_id TEXT NOT NULL, date TEXT NOT NULL, drink TEXT NOT NULL, PRIMARY KEY (profile_id, date));
 CREATE TABLE IF NOT EXISTS notify_log (
   id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, ok INTEGER NOT NULL, detail TEXT);
 CREATE INDEX IF NOT EXISTS idx_weights ON weights(profile_id, date);
 CREATE INDEX IF NOT EXISTS idx_water ON water(profile_id, date);
 CREATE INDEX IF NOT EXISTS idx_sleep ON sleep(profile_id, date);
 `);
+
+try { sqlite.exec('ALTER TABLE profiles ADD COLUMN avoid_eggs INTEGER NOT NULL DEFAULT 0'); } catch { /* موجود */ }
 
 export const db = drizzle(sqlite);
 

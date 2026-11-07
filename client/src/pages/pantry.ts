@@ -2,7 +2,7 @@ import { initLayout, revealCards, toast, gsap } from '../layout';
 import { api, esc } from '../api';
 
 const app = document.getElementById('app')!;
-const CATS = ['لحوم وبروتين', 'بقوليات', 'نشويات وحبوب', 'خضار', 'ألبان', 'دهون', 'فاكهة', 'إضافات'];
+const CATS = ['لحوم وبروتين', 'بقوليات', 'نشويات وحبوب', 'خضار', 'ألبان', 'دهون', 'فاكهة', 'إضافات', 'مشروبات'];
 
 async function load() {
   const items: any[] = await api('/pantry');

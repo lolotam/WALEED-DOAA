@@ -1,9 +1,9 @@
 import { Bot, InlineKeyboard } from 'grammy';
 import { getSetting, setSetting, sqlite, logNotify } from './db.js';
 import { getPlan, getPlanById, choose, autoChoose, shoppingLines, generatePlan, type PlanRow } from './planner.js';
-import { getProfiles, portionFor, targetsFor } from './nutrition.js';
+import { getProfiles, portionFor, targetsFor, drinkOf, setDrink } from './nutrition.js';
 import { todayKW, addDays, formatDateAr } from './time.js';
-import { SLOT_AR } from '../shared/types.js';
+import { SLOT_AR, DRINKS, type DrinkCode } from '../shared/types.js';
 import { pushAll } from './notify.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
@@ -41,7 +41,7 @@ function cardText(plan: PlanRow): string {
   const [w, d] = getProfiles();
   let t = `🍽️ <b>${SLOT_AR[plan.slot]} — ${formatDateAr(plan.date)}</b>\nاختاروا واحدة من التلاتة:\n`;
   plan.options.forEach((o, i) => {
-    const pw = portionFor(o, w, plan.slot), pd = portionFor(o, d, plan.slot);
+    const pw = portionFor(o, w, plan.slot, plan.date), pd = portionFor(o, d, plan.slot, plan.date);
     const mark = plan.chosenIndex === i ? ' ✅' : '';
     t += `\n${NUM[i]} <b>${esc(o.title)}</b>${mark}\n<i>${esc(o.cuisine)}</i> · ${esc(o.description)}\n`
       + `🟢 وليد ${pw.kcal} سعر · ${pw.protein}جم بروتين  |  🌸 دعاء ${pd.kcal} سعر · ${pd.protein}جم\n`;
@@ -56,12 +56,26 @@ function cardKeyboard(plan: PlanRow) {
   return kb;
 }
 
+function drinkText(date: string) {
+  const name = (c: DrinkCode) => (c === 'none' ? 'ولا حاجة' : `${DRINKS[c].icon} ${DRINKS[c].name} (${DRINKS[c].kcal} سعر)`);
+  return `☕ <b>مشروب الصبح — ${formatDateAr(date)}</b>\nسعراته بتتخصم من الفطار.\n`
+    + getProfiles().map((p) => `${p.id === 'waleed' ? '🟢' : '🌸'} ${p.name}: ${name(drinkOf(p.id, date))}`).join('\n');
+}
+function drinkKeyboard(date: string) {
+  const kb = new InlineKeyboard();
+  for (const p of getProfiles()) {
+    kb.text(`☕ ${p.name}`, `drink:${p.id}:${date}:coffee`).text(`🍵 ${p.name}`, `drink:${p.id}:${date}:tea`).text(`✖ ${p.name}`, `drink:${p.id}:${date}:none`).row();
+  }
+  return kb;
+}
+
 /** 9 بالليل: كروت أكل بكرة */
 export async function sendTomorrowCards() {
   const date = addDays(todayKW(), 1);
   const plans = await generatePlan(date);
   await send(`🌙 <b>منيو بكرة جاهز</b> — ${formatDateAr(date)}\nدوسوا على الوجبة اللي عايزينها. لو محدش اختار، هختار الأنسب قبل ميعادها.`, undefined, 'cards');
   for (const p of plans) await send(cardText(p), cardKeyboard(p), 'cards');
+  await send(drinkText(date), drinkKeyboard(date), 'cards');
   await pushAll('منيو بكرة جاهز 🍽️', 'اختاروا الفطار والغدا والعشا', '/meals.html');
 }
 
@@ -75,7 +89,9 @@ export async function sendIngredients(slot: 'breakfast' | 'lunch' | 'dinner') {
   let t = `🧺 <b>مكونات ${slotAr}: ${esc(opt.title)}</b>\n\n<b>الإجمالي للطبخة:</b>\n`;
   for (const l of total) t += `• ${esc(l.name)}${l.grams ? ` — ${l.grams} جم` : ''}\n`;
   for (const { p, portion } of people) {
+    const dr = slot === 'breakfast' ? drinkOf(p.id, date) : 'none';
     t += `\n${p.id === 'waleed' ? '🟢' : '🌸'} <b>طبق ${p.name}</b> (${portion.kcal} سعر · ${portion.protein}جم بروتين)\n`;
+    if (dr !== 'none') t += `  ${DRINKS[dr].icon} ${DRINKS[dr].name}\n`;
     for (const l of portion.lines) if (l.grams) t += `  ◦ ${esc(l.name)}: ${l.grams} جم\n`;
   }
   t += `\n👩‍🍳 <b>الطريقة:</b>\n` + opt.steps.map((s, i) => `${i + 1}. ${esc(s)}`).join('\n');
@@ -145,6 +161,14 @@ export function startBot() {
   });
 
   bot.command('tomorrow', async () => { await sendTomorrowCards(); });
+
+  bot.on('callback_query:data', async (ctx, next) => {
+    const dm = /^drink:(waleed|doaa):(\d{4}-\d{2}-\d{2}):(coffee|tea|none)$/.exec(ctx.callbackQuery.data);
+    if (!dm) return next();
+    setDrink(dm[1], dm[2], dm[3] as DrinkCode);
+    await ctx.answerCallbackQuery({ text: '✅ اتسجّل' });
+    try { await ctx.editMessageText(drinkText(dm[2]), { parse_mode: 'HTML', reply_markup: drinkKeyboard(dm[2]) }); } catch { /* نفس النص */ }
+  });
 
   bot.on('callback_query:data', async (ctx) => {
     const m = /^pick:(\d+):(\d)$/.exec(ctx.callbackQuery.data);

@@ -10,6 +10,8 @@ export type LibRecipe = MealOption & { needs: string[] };
 const chickenToBeef = (g: number) => ({ name: 'لحمة بقري (بدل الفراخ)', grams: Math.round(g * 0.85) });
 const chickenToFish = (g: number) => ({ name: 'سمك فيليه (بدل الفراخ)', grams: g });
 const chickenToShrimp = (g: number) => ({ name: 'جمبري (بدل الفراخ)', grams: g });
+/** بديل البيض لدعاء */
+const egg = (grams: number, alt: { name: string; grams: number }) => ({ name: 'بيض', grams, doaaAlt: alt, altFor: 'egg' as const });
 
 export const LIBRARY: Record<Slot, LibRecipe[]> = {
   breakfast: [
@@ -19,7 +21,7 @@ export const LIBRARY: Record<Slot, LibRecipe[]> = {
       steps: ['سخّن الفول بشوية مية.', 'اهرسه مع الكمون والليمون وزيت الزيتون.', 'قدّمه مع سلطة الطماطم والخيار والعيش.'] },
     { title: 'شكشوكة بالفلفل', cuisine: 'شامي', description: 'بيض مطبوخ في صلصة طماطم وفلفل وبصل.',
       baseKcal: 510, baseProtein: 25, needs: ['بيض', 'طماطم'],
-      ingredients: [{ name: 'بيض', grams: 150 }, { name: 'طماطم', grams: 200 }, { name: 'فلفل ألوان', grams: 80 }, { name: 'بصل', grams: 50 }, { name: 'زيت زيتون', grams: 7 }, { name: 'عيش بر', grams: 60 }],
+      ingredients: [egg(150, { name: 'جبنة قريش (بدل البيض)', grams: 180 }), { name: 'طماطم', grams: 200 }, { name: 'فلفل ألوان', grams: 80 }, { name: 'بصل', grams: 50 }, { name: 'زيت زيتون', grams: 7 }, { name: 'عيش بر', grams: 60 }],
       steps: ['شوّح البصل والفلفل في الزيت.', 'ضيف الطماطم المبشورة والبهارات وسيبها تتسبك 7 دقايق.', 'اكسر البيض فوقها وغطيها لحد ما يستوي.'] },
     { title: 'شوفان بالزبادي والموز', cuisine: 'صحي عالمي', description: 'شوفان باللبن مع زبادي يوناني وموز ومكسرات.',
       baseKcal: 560, baseProtein: 26, needs: ['شوفان', 'لبن لايت'],
@@ -27,7 +29,7 @@ export const LIBRARY: Record<Slot, LibRecipe[]> = {
       steps: ['اطبخ الشوفان مع اللبن 4 دقايق.', 'سيبه يفتر وضيف الزبادي.', 'زيّنه بالموز والمكسرات ونقطة عسل.'] },
     { title: 'جبنة قريش وبيض مسلوق', cuisine: 'مصري', description: 'طبق بروتين عالي مع خضار وعيش بر.',
       baseKcal: 500, baseProtein: 34, needs: ['جبنة قريش', 'بيض'],
-      ingredients: [{ name: 'جبنة قريش', grams: 150 }, { name: 'بيض', grams: 100 }, { name: 'عيش بر', grams: 60 }, { name: 'خيار وطماطم وجرجير', grams: 200 }, { name: 'زيت زيتون', grams: 5 }],
+      ingredients: [{ name: 'جبنة قريش', grams: 150 }, egg(100, { name: 'جبنة رومي (بدل البيض)', grams: 35 }), { name: 'عيش بر', grams: 60 }, { name: 'خيار وطماطم وجرجير', grams: 200 }, { name: 'زيت زيتون', grams: 5 }],
       steps: ['اسلق البيض 9 دقايق.', 'تبّل الجبنة بزيت الزيتون والكمون.', 'قدّمها مع الخضار والعيش.'] },
     { title: 'سندوتش تونة بالليمون', cuisine: 'صحي عالمي', description: 'تونة مصفّاة بالزبادي والليمون مع خضار وتفاحة.',
       baseKcal: 520, baseProtein: 34, needs: ['تونة', 'عيش بر'],
@@ -35,7 +37,7 @@ export const LIBRARY: Record<Slot, LibRecipe[]> = {
       steps: ['اخلط التونة مع الزبادي والليمون والفلفل.', 'حطها في العيش مع الخس والطماطم.', 'كُل التفاحة بعدها.'] },
     { title: 'أومليت خضار بالفيتا', cuisine: 'صحي عالمي', description: 'بيض بالكوسة والفلفل والبصل وجبنة فيتا لايت.',
       baseKcal: 525, baseProtein: 28, needs: ['بيض', 'كوسة'],
-      ingredients: [{ name: 'بيض', grams: 150 }, { name: 'جبنة فيتا لايت', grams: 30 }, { name: 'كوسة وفلفل وبصل', grams: 150 }, { name: 'زيت زيتون', grams: 7 }, { name: 'عيش بر', grams: 60 }],
+      ingredients: [egg(150, { name: 'جبنة قريش (بدل البيض)', grams: 180 }), { name: 'جبنة فيتا لايت', grams: 30 }, { name: 'كوسة وفلفل وبصل', grams: 150 }, { name: 'زيت زيتون', grams: 7 }, { name: 'عيش بر', grams: 60 }],
       steps: ['قطّع الخضار صغير وشوّحه دقيقتين.', 'اخفق البيض بالبهارات وصبّه على الخضار.', 'فتّت الفيتا فوقه وقلبه.'] },
     { title: 'حمص بالطحينة والزبادي', cuisine: 'شامي', description: 'فتة حمص خفيفة على عيش بر محمص.',
       baseKcal: 520, baseProtein: 25, needs: ['حمص', 'طحينة'],
@@ -111,7 +113,7 @@ export const LIBRARY: Record<Slot, LibRecipe[]> = {
       steps: ['قطّع البروتين شرايح وشوّحه على نار عالية.', 'ضيف الخضار 4 دقايق ويفضل مقرمش.', 'تبّل بالثوم والفلفل وقدّمه مع الرز.'] },
     { title: 'بابا غنوج وبيض مسلوق', cuisine: 'شامي', description: 'باذنجان مشوي بالطحينة مع بيض وعيش بر.',
       baseKcal: 480, baseProtein: 25, needs: ['باذنجان', 'بيض', 'طحينة'],
-      ingredients: [{ name: 'باذنجان', grams: 250 }, { name: 'طحينة', grams: 15 }, { name: 'زبادي', grams: 100 }, { name: 'بيض', grams: 100 }, { name: 'عيش بر', grams: 50 }],
+      ingredients: [{ name: 'باذنجان', grams: 250 }, { name: 'طحينة', grams: 15 }, { name: 'زبادي', grams: 100 }, egg(100, { name: 'تونة مصفّاة (بدل البيض)', grams: 110 }), { name: 'عيش بر', grams: 50 }],
       steps: ['اشوي الباذنجان لحد ما يطرى وقشّره.', 'اهرسه مع الطحينة والزبادي والثوم والليمون.', 'قدّمه مع البيض المسلوق والعيش.'] },
     { title: 'جبنة قريش بالخضار السوتيه', cuisine: 'مصري', description: 'عشا خفيف بروتين عالي.',
       baseKcal: 420, baseProtein: 32, needs: ['جبنة قريش', 'كوسة'],
@@ -119,3 +121,40 @@ export const LIBRARY: Record<Slot, LibRecipe[]> = {
       steps: ['شوّح الخضار بالزيت والبهارات.', 'قدّمه مع الجبنة القريش المتبلة والعيش.'] },
   ],
 };
+
+/**
+ * الفطار الثابت اللي وليد ودعاء بيحبوه. السعرات تقريبية لكل 100 جم:
+ * رومي 380 · حلوم 320 · جبنة طيبة 280 · لبنة 160 · لانشون 220 · بيض 143 · حلاوة طحينية 520 · عيش بر 250
+ */
+export const FIXED_BREAKFAST: LibRecipe[] = [
+  { title: 'رومي وبيض مع خضار', cuisine: 'فطار البيت', description: 'جبنة رومي وبيض مسلوق مع شيري وخيار وجزر. دعاء: رومي زيادة بدل البيض.',
+    baseKcal: 490, baseProtein: 29, needs: ['جبنة رومي'],
+    ingredients: [{ name: 'جبنة رومي', grams: 40 }, egg(100, { name: 'جبنة رومي إضافية (بدل البيض)', grams: 35 }), { name: 'عيش بر', grams: 60 },
+      { name: 'خيار وطماطم شيري', grams: 150 }, { name: 'جزر', grams: 50 }],
+    steps: ['اسلق البيض 9 دقايق.', 'قطّع الرومي شرايح رفيعة.', 'قدّمه مع الخضار والعيش.'] },
+  { title: 'حلوم مشوي بالشيري', cuisine: 'فطار البيت', description: 'حلوم على الجريل مع شيري وخيار وشوية لبنة.',
+    baseKcal: 475, baseProtein: 23, needs: ['جبنة حلوم'],
+    ingredients: [{ name: 'جبنة حلوم', grams: 70 }, { name: 'لبنة', grams: 30 }, { name: 'عيش بر', grams: 60 },
+      { name: 'طماطم شيري وخيار', grams: 200 }, { name: 'جزر', grams: 50 }],
+    steps: ['اشوي الحلوم على طاسة من غير زيت دقيقة على كل وش.', 'قطّع الخضار.', 'قدّمه مع اللبنة والعيش.'] },
+  { title: 'لبنة وجبنة طيبة', cuisine: 'فطار البيت', description: 'لبنة بزيت الزيتون وجبنة طيبة مع خضار. وليد: بيضة مسلوقة زيادة.',
+    baseKcal: 570, baseProtein: 23, needs: ['لبنة', 'جبنة طيبة'],
+    ingredients: [{ name: 'لبنة', grams: 80 }, { name: 'جبنة طيبة', grams: 40 }, egg(50, { name: 'جبنة رومي (بدل البيض)', grams: 20 }),
+      { name: 'عيش بر', grams: 70 }, { name: 'خيار وشيري وجزر', grams: 200 }, { name: 'زيت زيتون', grams: 5 }],
+    steps: ['حط اللبنة في طبق ونقطة زيت زيتون.', 'قطّع الخضار أصابع.', 'قدّمها مع الجبنة والعيش.'] },
+  { title: 'لانشون وبيض', cuisine: 'فطار البيت', description: 'لانشون مشوح مع بيض. دعاء: حلوم بدل البيض.',
+    baseKcal: 450, baseProtein: 25, needs: ['لانشون'],
+    ingredients: [{ name: 'لانشون', grams: 60 }, egg(100, { name: 'جبنة حلوم (بدل البيض)', grams: 45 }), { name: 'عيش بر', grams: 60 },
+      { name: 'خيار وطماطم شيري', grams: 150 }],
+    steps: ['شوّح اللانشون دقيقتين في طاسة من غير زيت.', 'اعمل البيض مسلوق أو أومليت (للي بياكله).', 'قدّمه مع الخضار.'] },
+  { title: 'حلاوة طحينية ورومي', cuisine: 'فطار البيت', description: 'حتة حلاوة صغيرة مع رومي وخضار. الكمية محسوبة بالظبط.',
+    baseKcal: 460, baseProtein: 18, needs: ['حلاوة طحينية', 'جبنة رومي'],
+    ingredients: [{ name: 'حلاوة طحينية', grams: 30 }, { name: 'جبنة رومي', grams: 30 }, { name: 'عيش بر', grams: 60 },
+      { name: 'خيار وجزر', grams: 150 }],
+    steps: ['وزّن الحلاوة بالميزان، دي أكتر حاجة سعراتها عالية.', 'كُل الخضار الأول.'] },
+  { title: 'طبق جبن مشكل', cuisine: 'فطار البيت', description: 'رومي وحلوم ولبنة مع خضار مشكل.',
+    baseKcal: 447, baseProtein: 22, needs: ['جبنة رومي', 'جبنة حلوم', 'لبنة'],
+    ingredients: [{ name: 'جبنة رومي', grams: 25 }, { name: 'جبنة حلوم', grams: 40 }, { name: 'لبنة', grams: 40 },
+      { name: 'عيش بر', grams: 50 }, { name: 'خيار وشيري وجزر', grams: 200 }],
+    steps: ['اشوي الحلوم.', 'رصّ الجبن والخضار في طبق.'] },
+];

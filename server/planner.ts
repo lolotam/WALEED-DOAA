@@ -1,6 +1,6 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { sqlite } from './db.js';
-import { LIBRARY } from './recipes.js';
+import { LIBRARY, FIXED_BREAKFAST, type LibRecipe } from './recipes.js';
 import { addDays } from './time.js';
 import { getProfiles, portionFor, targetsFor } from './nutrition.js';
 import type { MealOption, Slot } from '../shared/types.js';
@@ -47,14 +47,21 @@ function shuffle<T>(a: T[]): T[] {
   return b;
 }
 
-function libraryOptions(slot: Slot, date: string): MealOption[] {
+function libraryOptions(slot: Slot, date: string, n = 3, source: LibRecipe[] = LIBRARY[slot]): MealOption[] {
   const pantry = new Set(availablePantry());
   const recent = recentTitles(date);
-  const all = LIBRARY[slot];
+  const all = source;
   const ok = all.filter((r) => r.needs.every((n) => pantry.has(n)));
   const fresh = ok.filter((r) => !recent.has(r.title));
   const pool = [...shuffle(fresh), ...shuffle(ok.filter((r) => recent.has(r.title))), ...shuffle(all.filter((r) => !ok.includes(r)))];
-  return pool.slice(0, 3).map(({ needs, ...opt }) => opt);
+  return pool.slice(0, n).map(({ needs, ...opt }) => opt);
+}
+
+/** الفطار: اختيارين من فطار البيت الثابت + اختيار واحد متنوع */
+function breakfastMix(date: string, other?: MealOption[]): MealOption[] {
+  const fixed = libraryOptions('breakfast', date, 2, FIXED_BREAKFAST);
+  const extra = other?.[0] ?? libraryOptions('breakfast', date, 1)[0];
+  return [...fixed, extra];
 }
 
 function validOption(o: any): o is MealOption {
@@ -75,6 +82,7 @@ async function aiOptions(date: string): Promise<Record<Slot, MealOption[]> | nul
   const prompt = `أنت أخصائي تغذية. اعمل خطة وجبات ليوم ${date} لزوجين بيطبخوا نفس الطبخة وكل واحد ياخد كمية مختلفة.
 - وليد: هدفه ${tw.kcal} سعر و${tw.protein} جم بروتين في اليوم. بياكل فراخ عادي.
 - دعاء: هدفها ${td.kcal} سعر و${td.protein} جم بروتين. **مش بتاكل فراخ**. أي مكون فراخ لازم يكون له "doaaAlt" (لحمة بقري أو سمك أو جمبري أو بيض) بكمية مناسبة.
+- دعاء **مش بتاكل بيض** كمان: أي بيض لازم يكون ليه "doaaAlt" و"altFor":"egg".
 - الوجبات: فطار وغدا وعشا. لكل وجبة 3 اختيارات مختلفة من المطابخ: مصري، خليجي، شامي، صحي عالمي.
 - استخدم المكونات دي بس (وأي بهارات): ${availablePantry().join('، ')}.
 - ممنوع تكرار الأطباق دي: ${recent.join('، ') || 'لا يوجد'}.
@@ -85,7 +93,7 @@ async function aiOptions(date: string): Promise<Record<Slot, MealOption[]> | nul
 {"breakfast":[OPT,OPT,OPT],"lunch":[...],"dinner":[...]}
 و OPT = {"title":"...","cuisine":"...","description":"سطر واحد","baseKcal":500,"baseProtein":30,
 "ingredients":[{"name":"...","grams":150,"doaaAlt":{"name":"...","grams":150}}],"steps":["...","..."]}
-(doaaAlt اختياري ويُستخدم بس مع الفراخ)`;
+(doaaAlt اختياري ويُستخدم بس مع الفراخ أو البيض، ومع البيض ضيف "altFor":"egg")`;
 
   try {
     const res: any = await client.messages.create({
@@ -115,8 +123,10 @@ export async function generatePlan(date: string, force = false): Promise<PlanRow
   const ai = await aiOptions(date);
   const ins = sqlite.prepare(`INSERT INTO meal_plans(date,slot,options_json,source) VALUES (?,?,?,?)
     ON CONFLICT(date,slot) DO UPDATE SET options_json=excluded.options_json, source=excluded.source, chosen_index=NULL, chosen_by=NULL, eaten=0`);
+  const have = new Set(existing.map((p) => p.slot));
   for (const s of SLOTS) {
-    const opts = ai?.[s] ?? libraryOptions(s, date);
+    if (!force && have.has(s)) continue;
+    const opts = s === 'breakfast' ? breakfastMix(date, ai?.breakfast) : (ai?.[s] ?? libraryOptions(s, date));
     ins.run(date, s, JSON.stringify(opts), ai ? 'ai' : 'library');
   }
   return getPlan(date);
@@ -124,7 +134,7 @@ export async function generatePlan(date: string, force = false): Promise<PlanRow
 
 /** يبدّل اختيارات وجبة واحدة بخيارات جديدة من المكتبة */
 export function regenerateSlot(date: string, slot: Slot) {
-  const opts = libraryOptions(slot, date);
+  const opts = slot === 'breakfast' ? breakfastMix(date) : libraryOptions(slot, date);
   sqlite.prepare("UPDATE meal_plans SET options_json=?, source='library', chosen_index=NULL, chosen_by=NULL WHERE date=? AND slot=?")
     .run(JSON.stringify(opts), date, slot);
 }
@@ -145,7 +155,7 @@ export function autoChoose(plan: PlanRow): number {
 /** قائمة المكونات المجمّعة للوجبة المختارة (للاتنين) */
 export function shoppingLines(plan: PlanRow, idx: number) {
   const opt = plan.options[idx];
-  const people = getProfiles().map((p) => ({ p, portion: portionFor(opt, p, plan.slot) }));
+  const people = getProfiles().map((p) => ({ p, portion: portionFor(opt, p, plan.slot, plan.date) }));
   const total = new Map<string, number>();
   for (const { portion } of people) for (const l of portion.lines) total.set(l.name, (total.get(l.name) ?? 0) + l.grams);
   return { opt, people, total: [...total.entries()].map(([name, grams]) => ({ name, grams })), slotAr: SLOT_AR[plan.slot] };

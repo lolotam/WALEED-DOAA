@@ -10,8 +10,10 @@ export interface Ingredient {
   name: string;
   /** الكمية بالجرام لحصة أساسية (baseKcal) */
   grams: number;
-  /** بديل لدعاء (مثلًا بدل الفراخ) */
+  /** بديل لأي حد مش بياكل المكون ده (فراخ أو بيض) */
   doaaAlt?: { name: string; grams: number };
+  /** سبب البديل — الافتراضي فراخ */
+  altFor?: 'chicken' | 'egg';
 }
 
 export interface MealOption {
@@ -27,3 +29,9 @@ export interface MealOption {
 
 export interface PortionLine { name: string; grams: number }
 export interface PersonPortion { kcal: number; protein: number; lines: PortionLine[] }
+
+export type DrinkCode = 'coffee' | 'tea' | 'none';
+export const DRINKS: Record<Exclude<DrinkCode, 'none'>, { name: string; kcal: number; protein: number; icon: string }> = {
+  coffee: { name: 'قهوة فرنساوي بالحليب', kcal: 70, protein: 4, icon: '☕' },
+  tea: { name: 'شاي بالحليب (سكر دايت)', kcal: 60, protein: 3, icon: '🍵' },
+};

@@ -22,6 +22,8 @@ export function seed() {
     waterGoalMl: 2500, color: '#F472B6', avoidChicken: 1,
   });
 
+  sqlite.prepare("UPDATE profiles SET avoid_eggs=1 WHERE id='doaa'").run();
+
   const insW = sqlite.prepare('INSERT INTO weights(profile_id,date,weight_kg,body_fat_pct,note) VALUES (?,?,?,?,?)');
   insW.run('waleed', '2026-11-07', 94, null, 'وزن البداية');
   insW.run('doaa', '2026-11-07', 93.6, 45.9, 'InBody — البداية');
@@ -44,6 +46,16 @@ export function seed() {
 function migrate() {
   const done = (k: string) => (sqlite.prepare('SELECT 1 FROM settings WHERE key=?').get(`mig:${k}`) ? true : false);
   const mark = (k: string) => sqlite.prepare('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)').run(`mig:${k}`, new Date().toISOString());
+  if (!done('fixed-breakfast')) {
+    sqlite.prepare("UPDATE profiles SET avoid_eggs=1 WHERE id='doaa'").run();
+    const ins = sqlite.prepare('INSERT INTO pantry(name,category,available) SELECT ?,?,1 WHERE NOT EXISTS (SELECT 1 FROM pantry WHERE name=?)');
+    for (const [n, c] of [['جبنة رومي', 'ألبان'], ['جبنة حلوم', 'ألبان'], ['جبنة طيبة', 'ألبان'], ['لبنة', 'ألبان'],
+      ['لانشون', 'لحوم وبروتين'], ['حلاوة طحينية', 'إضافات'], ['طماطم شيري', 'خضار'],
+      ['قهوة فرنساوي', 'مشروبات'], ['شاي', 'مشروبات'], ['سكر دايت', 'مشروبات']]) ins.run(n, c, n);
+    // فطار بكرة اللي اتولّد قبل التحديث يتعمل من جديد بالفطار الثابت (لو محدش اختار)
+    sqlite.prepare("DELETE FROM meal_plans WHERE slot='breakfast' AND chosen_index IS NULL AND date >= date('now')").run();
+    mark('fixed-breakfast');
+  }
   if (!done('doaa-birthdate')) {
     sqlite.prepare("UPDATE profiles SET birth_date='1989-11-26' WHERE id='doaa'").run();
     mark('doaa-birthdate');

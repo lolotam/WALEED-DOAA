@@ -4,7 +4,7 @@ import { serveStatic } from '@hono/node-server/serve-static';
 import { getSignedCookie, setSignedCookie, deleteCookie } from 'hono/cookie';
 import { sqlite } from './db.js';
 import { seed } from './seed.js';
-import { getProfiles, getProfile, targetsFor, portionFor } from './nutrition.js';
+import { getProfiles, getProfile, targetsFor, portionFor, drinkOf, setDrink } from './nutrition.js';
 import { getPlan, generatePlan, getPlanById, choose, regenerateSlot } from './planner.js';
 import { todayKW, addDays } from './time.js';
 import { startBot, sendTomorrowCards, sendIngredients, sendWeeklyReport, sendWeighReminder, telegramStatus } from './bot.js';
@@ -48,11 +48,15 @@ function dayStats(id: string, date: string) {
   return { water, sleep };
 }
 
+function drinksFor(date: string) {
+  return Object.fromEntries(getProfiles().map((p) => [p.id, drinkOf(p.id, date)]));
+}
+
 function planWithPortions(date: string) {
   const people = getProfiles();
   return getPlan(date).map((p) => ({
     ...p,
-    options: p.options.map((o) => ({ ...o, portions: Object.fromEntries(people.map((pr) => [pr.id, portionFor(o, pr, p.slot)])) })),
+    options: p.options.map((o) => ({ ...o, portions: Object.fromEntries(people.map((pr) => [pr.id, portionFor(o, pr, p.slot, date)])) })),
   }));
 }
 
@@ -64,7 +68,7 @@ app.get('/api/dashboard', async (c) => {
     weights: sqlite.prepare('SELECT date, weight_kg FROM weights WHERE profile_id=? ORDER BY date').all(p.id),
     week: Array.from({ length: 7 }, (_, i) => { const d = addDays(date, i - 6); return { date: d, ...dayStats(p.id, d) }; }),
   }));
-  return c.json({ date, people, plan: planWithPortions(date) });
+  return c.json({ date, people, plan: planWithPortions(date), drinks: drinksFor(date) });
 });
 
 // ---------- profiles ----------
@@ -74,11 +78,11 @@ app.put('/api/profiles/:id', async (c) => {
   if (!getProfile(id)) return c.json({ error: 'not found' }, 404);
   const b = await c.req.json();
   const fields: Record<string, string> = { name: 'name', birthDate: 'birth_date', heightCm: 'height_cm', goalWeight: 'goal_weight',
-    activityFactor: 'activity_factor', bodyFatPct: 'body_fat_pct', waterGoalMl: 'water_goal_ml', avoidChicken: 'avoid_chicken' };
+    activityFactor: 'activity_factor', bodyFatPct: 'body_fat_pct', waterGoalMl: 'water_goal_ml', avoidChicken: 'avoid_chicken', avoidEggs: 'avoid_eggs' };
   for (const [k, col] of Object.entries(fields)) {
     if (!(k in b)) continue;
     let v = b[k];
-    if (k === 'avoidChicken') v = v ? 1 : 0;
+    if (k === 'avoidChicken' || k === 'avoidEggs') v = v ? 1 : 0;
     else if (k !== 'name' && k !== 'birthDate') v = num(v);
     sqlite.prepare(`UPDATE profiles SET ${col}=? WHERE id=?`).run(v, id);
   }
@@ -128,7 +132,7 @@ app.post('/api/sleep', async (c) => {
 app.get('/api/plan', async (c) => {
   const date = c.req.query('date') || todayKW();
   if (getPlan(date).length < 3 && date >= todayKW() && date <= addDays(todayKW(), 2)) await generatePlan(date);
-  return c.json({ date, plan: planWithPortions(date) });
+  return c.json({ date, plan: planWithPortions(date), drinks: drinksFor(date) });
 });
 app.post('/api/plan/:id/choose', async (c) => {
   const { index } = await c.req.json();
@@ -146,6 +150,13 @@ app.post('/api/plan/regenerate', async (c) => {
   const { date, slot } = await c.req.json();
   if (slot && SLOTS.includes(slot)) regenerateSlot(date, slot as Slot);
   else await generatePlan(date, true);
+  return c.json({ ok: true });
+});
+
+app.post('/api/drinks', async (c) => {
+  const b = await c.req.json();
+  if (!isProfile(b.profileId) || !['coffee', 'tea', 'none'].includes(b.drink)) return c.json({ error: 'bad' }, 400);
+  setDrink(b.profileId, b.date || todayKW(), b.drink);
   return c.json({ ok: true });
 });
 

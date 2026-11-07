@@ -3,10 +3,23 @@ import { api, esc, fmtDate, todayKW, addDays, SLOT_AR, SLOT_IC } from '../api';
 
 const app = document.getElementById('app')!;
 let date = new URLSearchParams(location.search).get('date') || todayKW();
+let curDrinks: Record<string, string> = {};
+const DR = [['coffee', '☕ قهوة بالحليب'], ['tea', '🍵 شاي بالحليب'], ['none', '✖ ولا حاجة']];
+
+function drinkRow() {
+  return `<div class="card" style="box-shadow:none;background:var(--card-2);padding:12px;margin-bottom:12px">
+    <div class="small muted" style="margin-bottom:8px">☕ مشروب الصبح (سعراته بتتخصم من الفطار)</div>
+    ${(['waleed', 'doaa'] as const).map((id) => `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <b style="color:var(--${id});min-width:44px">${id === 'waleed' ? 'وليد' : 'دعاء'}</b>
+      <div class="chips">${DR.map(([k, l]) => `<span class="chip ${curDrinks[id] === k || (!curDrinks[id] && k === 'none') ? 'on' : ''}" data-drink="${id}:${k}">${l}</span>`).join('')}</div>
+    </div>`).join('')}
+  </div>`;
+}
 
 async function load() {
   app.innerHTML = '<div class="skeleton"></div>';
-  const { plan } = await api(`/plan?date=${date}`);
+  const { plan, drinks } = await api(`/plan?date=${date}`);
+  curDrinks = drinks || {};
   const t = todayKW();
   const label = date === t ? 'النهارده' : date === addDays(t, 1) ? 'بكرة' : date === addDays(t, -1) ? 'امبارح' : '';
 
@@ -47,6 +60,11 @@ async function load() {
     await api(`/plan/${id}/eaten`, { body: { eaten: v === '1' } });
     toast(v === '1' ? '👏 برافو!' : 'اتلغى'); load();
   }));
+  app.querySelectorAll<HTMLElement>('[data-drink]').forEach((ch) => ch.addEventListener('click', async () => {
+    const [profileId, drink] = ch.dataset.drink!.split(':');
+    await api('/drinks', { body: { profileId, date, drink } });
+    toast('☕ اتسجّل'); load();
+  }));
   revealCards(app);
 }
 
@@ -59,6 +77,7 @@ function slotCard(p: any) {
         <button class="btn sm" data-regen="${p.slot}" title="اختيارات تانية">🔄 غيّر</button>
       </div>
     </div>
+    ${p.slot === 'breakfast' ? drinkRow() : ''}
     <div class="options">${p.options.map((o: any, i: number) => optCard(p, o, i)).join('')}</div>
   </section>`;
 }

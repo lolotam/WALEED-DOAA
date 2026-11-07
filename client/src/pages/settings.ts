@@ -34,6 +34,7 @@ async function load() {
     e.preventDefault();
     const b: any = Object.fromEntries(new FormData(f));
     b.avoidChicken = f.querySelector<HTMLInputElement>('[name=avoidChicken]')!.checked;
+    b.avoidEggs = f.querySelector<HTMLInputElement>('[name=avoidEggs]')!.checked;
     b.waterGoalMl = Math.round(Number(b.waterL) * 1000); delete b.waterL;
     const r = await api(`/profiles/${f.dataset.id}`, { method: 'PUT', body: b });
     toast(`✅ اتحفظ — السعرات ${r.targets.kcal}`); load();
@@ -85,6 +86,7 @@ function profileForm(p: any) {
       <div class="field full"><label>مستوى النشاط</label><select class="input" name="activityFactor">
         ${ACT.map(([v, l]) => `<option value="${v}" ${Number(p.activity_factor) === v ? 'selected' : ''}>${l}</option>`).join('')}</select></div>
       <label class="full" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="avoidChicken" ${p.avoid_chicken ? 'checked' : ''}> مش بياكل فراخ (يتبدّل بلحمة أو سمك)</label>
+      <label class="full" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="avoidEggs" ${p.avoid_eggs ? 'checked' : ''}> مش بياكل بيض (يتبدّل بجبنة أو تونة)</label>
       <button class="btn c full">حفظ</button>
     </div>
   </form>`;
