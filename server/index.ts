@@ -10,6 +10,7 @@ import { todayKW, addDays } from './time.js';
 import { startBot, sendTomorrowCards, sendIngredients, sendWeeklyReport, sendWeighReminder, sendWaterReminder, telegramStatus } from './bot.js';
 import { startScheduler, getSchedule, saveSchedule, SCHEDULE_META } from './scheduler.js';
 import { pushEnabled, saveSubscription, pushAll } from './notify.js';
+import { imageFor } from './meal-images.js';
 import type { Slot } from '../shared/types.js';
 import { SLOTS } from '../shared/types.js';
 
@@ -56,7 +57,7 @@ function planWithPortions(date: string) {
   const people = getProfiles();
   return getPlan(date).map((p) => ({
     ...p,
-    options: p.options.map((o) => ({ ...o, portions: Object.fromEntries(people.map((pr) => [pr.id, portionFor(o, pr, p.slot, date)])) })),
+    options: p.options.map((o) => ({ ...o, image: imageFor(o.title), portions: Object.fromEntries(people.map((pr) => [pr.id, portionFor(o, pr, p.slot, date)])) })),
   }));
 }
 
