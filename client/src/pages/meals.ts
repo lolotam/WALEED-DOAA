@@ -86,7 +86,8 @@ function optCard(p: any, o: any, i: number) {
   const w = o.portions.waleed, d = o.portions.doaa;
   const lines = (pp: any) => pp.lines.filter((l: any) => l.grams).map((l: any) => `<li>${esc(l.name)} — <b>${l.grams}</b> جم</li>`).join('');
   return `<article class="opt ${p.chosenIndex === i ? 'chosen' : ''}" data-choose="${p.id}:${i}">
-    ${o.image ? `<img class="opt-img" src="${esc(o.image)}" alt="${esc(o.title)}" loading="lazy">` : ''}
+    ${o.image ? `<img class="opt-img" src="${esc(o.image)}" alt="${esc(o.title)}" loading="lazy">`
+      : `<div class="opt-img opt-ph"><span>${SLOT_IC[p.slot]}</span><small>الصورة قريب</small></div>`}
     <div style="display:flex;justify-content:space-between;gap:8px;align-items:start">
       <div class="t">${esc(o.title)}</div>
       ${p.chosenIndex === i ? '<span class="chosen-badge">✓ مختارة</span>' : `<span class="tag">${i + 1}</span>`}

@@ -100,6 +100,7 @@ function drinkName(c?: string) { return c === 'coffee' ? 'قهوة بالحلي�
 function todayMeal(p: any) {
   const o = p.chosenIndex != null ? p.options[p.chosenIndex] : null;
   return `<div class="card" style="box-shadow:none;background:var(--card-2)">
+    ${o?.image ? `<img class="opt-img" src="${esc(o.image)}" alt="${esc(o.title)}" loading="lazy" style="width:calc(100% + 36px);margin:-18px -18px 10px">` : ''}
     <div class="muted small">${SLOT_IC[p.slot]} ${SLOT_AR[p.slot]}</div>
     ${o ? `<div style="font-weight:700;margin:4px 0">${esc(o.title)}</div>
       <div class="small"><span style="color:var(--waleed)">وليد ${o.portions.waleed.kcal}</span> · <span style="color:var(--doaa)">دعاء ${o.portions.doaa.kcal}</span> سعر</div>`

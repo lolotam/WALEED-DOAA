@@ -189,6 +189,10 @@ main { max-width: 1120px; margin: 0 auto; padding: 20px 16px; display: grid; gap
 .opt:hover { transform: translateY(-2px); }
 .opt.chosen { border-color: var(--lime); box-shadow: 0 0 0 1px var(--lime) inset, 0 0 24px color-mix(in srgb, var(--lime) 18%, transparent); }
 .opt .t { font-weight: 700; }
+.opt-ph { display: grid !important; place-items: center; align-content: center; gap: 4px;
+  background: radial-gradient(circle at 30% 20%, color-mix(in srgb, var(--waleed) 25%, transparent), transparent 60%),
+              radial-gradient(circle at 80% 90%, color-mix(in srgb, var(--doaa) 25%, transparent), transparent 60%), var(--card); }
+.opt-ph span { font-size: 2.6rem; } .opt-ph small { color: var(--muted); }
 .opt-img { width: calc(100% + 28px); margin: -14px -14px 4px; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 16px 16px 0 0; display: block; }
 .opt .portions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; font-size: .78rem; }
 .opt .portions div { border-radius: 10px; padding: 6px 8px; background: var(--card); }
