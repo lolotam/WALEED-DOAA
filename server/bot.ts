@@ -5,6 +5,7 @@ import { getProfiles, portionFor, targetsFor, drinkOf, setDrink } from './nutrit
 import { todayKW, addDays, formatDateAr } from './time.js';
 import { SLOT_AR, DRINKS, type DrinkCode } from '../shared/types.js';
 import { pushAll } from './notify.js';
+import { getSchedule } from './scheduler.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 export const bot = token ? new Bot(token) : null;
@@ -125,11 +126,25 @@ export async function sendWeeklyReport() {
   await send(t, new InlineKeyboard().url('📈 التقرير الكامل', `${SITE}/history.html`), 'report');
 }
 
-/** بعد الساعة 9 بالليل: لو كروت بكرة متبعتتش، ابعتها */
+/** تذكير المية */
+export async function sendWaterReminder() {
+  const lines = getProfiles().map((p) => {
+    const ml = (sqlite.prepare('SELECT COALESCE(SUM(ml),0) s FROM water WHERE profile_id=? AND date=?').get(p.id, todayKW()) as any).s;
+    return `${p.id === 'waleed' ? '🟢' : '🌸'} ${p.name}: ${(ml / 1000).toFixed(2)} من ${(p.water_goal_ml / 1000).toFixed(1)} لتر`;
+  });
+  await send(`💧 <b>اشربوا مية</b>\n${lines.join('\n')}`, new InlineKeyboard().url('💧 سجّل كوباية', `${SITE}/log.html`), 'water');
+  await pushAll('💧 اشربوا مية', 'كوباية دلوقتي', '/log.html');
+}
+
+/** لو ميعاد كروت بكرة عدّى النهارده ومتبعتتش، ابعتها */
 export async function catchUpCards() {
-  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kuwait', hour: '2-digit', hour12: false }).format(new Date()));
-  if (h < 21) return;
-  const since = new Date(Date.now() - (h - 21 + 1) * 3600000).toISOString();
+  const cfg = getSchedule().cards;
+  if (!cfg.enabled) return;
+  const now = new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kuwait', hour: '2-digit', minute: '2-digit', hour12: false }).format(new Date());
+  if (now < cfg.times[0]) return;
+  const [h, m] = cfg.times[0].split(':').map(Number);
+  const [nh, nm] = now.split(':').map(Number);
+  const since = new Date(Date.now() - ((nh * 60 + nm) - (h * 60 + m) + 5) * 60000).toISOString();
   const sent = sqlite.prepare("SELECT 1 FROM notify_log WHERE kind='cards' AND ok=1 AND at >= ?").get(since);
   if (!sent) await sendTomorrowCards();
 }

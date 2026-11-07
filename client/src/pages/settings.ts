@@ -10,9 +10,10 @@ const ACT = [
 let pushKey: string | null = null;
 
 async function load() {
-  const [profiles, tg]: [any[], any] = await Promise.all([api('/profiles'), api('/telegram/status')]);
+  const [profiles, tg, sch]: [any[], any, any] = await Promise.all([api('/profiles'), api('/telegram/status'), api('/schedule')]);
   app.innerHTML = `
     <h1 class="page-title">الإعدادات ⚙️</h1>
+    <div id="sch"></div>
     <div class="grid-2">${profiles.map(profileForm).join('')}</div>
 
     <div class="card"><h3>🔔 الإشعارات</h3>
@@ -28,6 +29,8 @@ async function load() {
     <div class="card"><h3>🚪 الحساب</h3><button class="btn" id="logout">تسجيل خروج</button></div>
     <p class="muted small">⚠️ الأرقام دي حسابات تقديرية مش بديل عن الدكتور. الحد الأدنى للسعرات 1500 للراجل و1200 للست.</p>`;
   app.querySelector('#tg')!.outerHTML = telegramCard(tg);
+  app.querySelector('#sch')!.outerHTML = scheduleCard(sch, !!tg.chatId);
+  bindSchedule(sch);
   revealCards(app);
 
   app.querySelectorAll<HTMLFormElement>('form[data-id]').forEach((f) => f.addEventListener('submit', async (e) => {
@@ -50,6 +53,55 @@ async function load() {
   app.querySelector('#logout')!.addEventListener('click', async () => { await api('/logout', { body: {} }); location.href = '/login.html'; });
 }
 
+const DAYS = ['الأحد', 'الاتنين', 'التلات', 'الأربع', 'الخميس', 'الجمعة', 'السبت'];
+
+function scheduleCard(sch: any, connected: boolean) {
+  return `<form class="card" id="schF">
+    <div class="slot-head"><h3 style="margin:0">⚙️ مواعيد الإرسال والتذكيرات</h3><span class="tag">🕐 الكويت: ${esc(sch.now)}</span></div>
+    <div style="display:grid;gap:10px">
+    ${sch.meta.map((m: any) => {
+      const c = sch.schedule[m.key];
+      return `<div class="card" data-job="${m.key}" style="box-shadow:none;background:var(--card-2);padding:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+          <label style="display:flex;gap:10px;align-items:center;cursor:pointer">
+            <input type="checkbox" name="enabled" ${c.enabled ? 'checked' : ''} style="width:20px;height:20px;accent-color:var(--lime)">
+            <span><b>${esc(m.label)}</b><br><span class="muted small">${esc(m.hint)}</span></span>
+          </label>
+          <button type="button" class="btn sm" data-test="${m.key}" ${connected ? '' : 'disabled'}>ابعت دلوقتي</button>
+        </div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center">
+          ${m.multi
+            ? `<input class="input" name="times" value="${c.times.join('، ')}" placeholder="10:00، 12:00، 14:00" style="flex:1;min-width:200px">`
+            : `<input class="input" type="time" name="times" value="${c.times[0]}" style="max-width:150px">`}
+          ${m.weekly
+            ? `<select class="input" name="day" style="max-width:150px">${DAYS.map((d, i) => `<option value="${i}" ${c.days[0] === i ? 'selected' : ''}>${d}</option>`).join('')}</select>`
+            : '<span class="muted small">كل يوم</span>'}
+        </div>
+      </div>`;
+    }).join('')}
+    </div>
+    <p class="muted small" style="margin:10px 0">خطة بكرة بتتولّد تلقائيًا قبل ميعاد الكروت بنص ساعة. تذكير المية: اكتب المواعيد بينها فاصلة.</p>
+    <button class="btn primary block">حفظ المواعيد</button>
+  </form>`;
+}
+
+function bindSchedule(sch: any) {
+  app.querySelector<HTMLFormElement>('#schF')!.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const body: any = {};
+    app.querySelectorAll<HTMLElement>('[data-job]').forEach((row) => {
+      const key = row.dataset.job!;
+      const meta = sch.meta.find((m: any) => m.key === key);
+      const raw = row.querySelector<HTMLInputElement>('[name=times]')!.value;
+      const times = raw.split(/[،,\s]+/).map((t) => t.trim()).filter(Boolean).map((t) => (t.length === 4 ? '0' + t : t));
+      const day = row.querySelector<HTMLSelectElement>('[name=day]');
+      body[key] = { enabled: row.querySelector<HTMLInputElement>('[name=enabled]')!.checked, times, days: meta.weekly && day ? [Number(day.value)] : [] };
+    });
+    try { await api('/schedule', { method: 'PUT', body }); toast('✅ المواعيد اتحفظت واشتغلت'); load(); }
+    catch (err) { toast((err as Error).message); }
+  });
+}
+
 function telegramCard(tg: any) {
   const status = !tg.enabled ? '<span class="tag" style="color:var(--danger)">التوكن مش موجود</span>'
     : tg.chatId ? `<span class="tag c" style="--c:var(--lime)">✅ متوصل بـ ${esc(tg.chatTitle || 'الجروب')}</span>`
@@ -58,11 +110,6 @@ function telegramCard(tg: any) {
   return `<div class="card">
     <div class="slot-head"><h3 style="margin:0">🤖 بوت التليجرام ${tg.botUsername ? `<a class="muted small" href="https://t.me/${esc(tg.botUsername)}" target="_blank">@${esc(tg.botUsername)}</a>` : ''}</h3>${status}</div>
     ${tg.chatId ? '' : `<p class="small" style="margin-bottom:12px">ضيف البوت للجروب (هيتسجّل لوحده)، أو ابعتله <b>/start</b> في الخاص. وبعدها حدّث الصفحة. لو مفيش ولا "incoming" في السجل تحت، يبقى الرسايل مش واصلة للبوت.</p>`}
-    <div style="overflow-x:auto"><table class="table">
-      <thead><tr><th>الرسالة</th><th>الميعاد</th><th>الأيام</th><th></th></tr></thead>
-      <tbody>${tg.schedule.map((s: any) => `<tr><td>${esc(s.label)}</td><td>${s.time}</td><td class="muted">${s.days}</td>
-        <td><button class="btn sm" data-test="${s.key}" ${tg.chatId ? '' : 'disabled'}>ابعت دلوقتي</button></td></tr>`).join('')}</tbody>
-    </table></div>
     <details style="margin-top:12px"><summary class="muted small" style="cursor:pointer">سجل الإرسال (${tg.log.length})</summary>
       <table class="table small" style="margin-top:8px"><tbody>${tg.log.map((l: any) => `<tr>
         <td>${l.ok ? '✅' : '❌'}</td><td class="muted">${fmt(l.at)}</td><td>${esc(l.kind)}</td><td>${esc(l.detail || '')}</td></tr>`).join('')
