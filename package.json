@@ -1,0 +1,34 @@
+{
+  "name": "waleed-doaa-health",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "متابعة الوزن والوجبات والصحة لوليد ودعاء",
+  "scripts": {
+    "dev:server": "tsx watch server/index.ts",
+    "dev:client": "vite",
+    "build": "vite build",
+    "start": "tsx server/index.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.6.0",
+    "@hono/node-server": "^2.1.6",
+    "better-sqlite3": "^13.0.3",
+    "drizzle-orm": "^0.45.4",
+    "grammy": "^1.46.0",
+    "gsap": "^3.15.1",
+    "hono": "^4.13.17",
+    "node-cron": "^4.6.0",
+    "tsx": "^4.23.15",
+    "web-push": "^4.0.0"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/node-cron": "^3.0.11",
+    "@types/web-push": "^3.6.4",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.6"
+  }
+}
