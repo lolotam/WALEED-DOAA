@@ -1,5 +1,5 @@
 import { Bot, InlineKeyboard } from 'grammy';
-import { getSetting, setSetting, sqlite } from './db.js';
+import { getSetting, setSetting, sqlite, logNotify } from './db.js';
 import { getPlan, getPlanById, choose, autoChoose, shoppingLines, generatePlan, type PlanRow } from './planner.js';
 import { getProfiles, portionFor, targetsFor } from './nutrition.js';
 import { todayKW, addDays, formatDateAr } from './time.js';
@@ -14,10 +14,27 @@ const NUM = ['1️⃣', '2️⃣', '3️⃣'];
 
 function chatId(): string | null { return getSetting('telegram_chat_id'); }
 
-async function send(text: string, keyboard?: InlineKeyboard) {
+export let botUsername: string | null = null;
+
+/** يبعت للجروب ويسجّل النتيجة في سجل الإرسال (بيظهر في صفحة الإعدادات) */
+async function send(text: string, keyboard?: InlineKeyboard, kind = 'message') {
   const id = chatId();
-  if (!bot || !id) { console.log('[bot] skipped (no token/chat):', text.slice(0, 60)); return; }
-  await bot.api.sendMessage(id, text, { parse_mode: 'HTML', reply_markup: keyboard, link_preview_options: { is_disabled: true } });
+  if (!bot) { logNotify(kind, false, 'التوكن مش موجود'); return; }
+  if (!id) { logNotify(kind, false, 'الجروب مش متسجّل — اكتب /start في الجروب'); return; }
+  try {
+    await bot.api.sendMessage(id, text, { parse_mode: 'HTML', reply_markup: keyboard, link_preview_options: { is_disabled: true } });
+    logNotify(kind, true, text.replace(/<[^>]+>/g, '').split('\n')[0]);
+  } catch (e) {
+    logNotify(kind, false, (e as Error).message);
+    throw e;
+  }
+}
+
+export function telegramStatus() {
+  return {
+    enabled: !!bot, botUsername, chatId: chatId(), chatTitle: getSetting('telegram_chat_title'),
+    log: sqlite.prepare('SELECT * FROM notify_log ORDER BY id DESC LIMIT 30').all(),
+  };
 }
 
 function cardText(plan: PlanRow): string {
@@ -35,6 +52,7 @@ function cardText(plan: PlanRow): string {
 function cardKeyboard(plan: PlanRow) {
   const kb = new InlineKeyboard();
   plan.options.forEach((o, i) => kb.text(`${NUM[i]} ${o.title.slice(0, 22)}`, `pick:${plan.id}:${i}`).row());
+  kb.url('📱 التفاصيل في الموقع', `${SITE}/meals.html?date=${plan.date}`);
   return kb;
 }
 
@@ -42,8 +60,8 @@ function cardKeyboard(plan: PlanRow) {
 export async function sendTomorrowCards() {
   const date = addDays(todayKW(), 1);
   const plans = await generatePlan(date);
-  await send(`🌙 <b>منيو بكرة جاهز</b> — ${formatDateAr(date)}\nدوسوا على الوجبة اللي عايزينها. لو محدش اختار، هختار الأنسب قبل ميعادها.`);
-  for (const p of plans) await send(cardText(p), cardKeyboard(p));
+  await send(`🌙 <b>منيو بكرة جاهز</b> — ${formatDateAr(date)}\nدوسوا على الوجبة اللي عايزينها. لو محدش اختار، هختار الأنسب قبل ميعادها.`, undefined, 'cards');
+  for (const p of plans) await send(cardText(p), cardKeyboard(p), 'cards');
   await pushAll('منيو بكرة جاهز 🍽️', 'اختاروا الفطار والغدا والعشا', '/meals.html');
 }
 
@@ -61,14 +79,14 @@ export async function sendIngredients(slot: 'breakfast' | 'lunch' | 'dinner') {
     for (const l of portion.lines) if (l.grams) t += `  ◦ ${esc(l.name)}: ${l.grams} جم\n`;
   }
   t += `\n👩‍🍳 <b>الطريقة:</b>\n` + opt.steps.map((s, i) => `${i + 1}. ${esc(s)}`).join('\n');
-  t += `\n\n<a href="${SITE}/meals.html">افتح في الموقع</a>`;
-  await send(t);
+  await send(t, new InlineKeyboard().url('📱 افتح في الموقع', `${SITE}/meals.html`), `ingredients-${slot}`);
   await pushAll(`مكونات ${slotAr} 🧺`, opt.title, '/meals.html');
 }
 
 /** الجمعة بالليل */
 export async function sendWeighReminder() {
-  await send(`⚖️ <b>ميعاد الوزن الأسبوعي</b>\nبكرة الصبح على الريق، بعد الحمام وقبل الأكل.\nسجّلوا من هنا: ${SITE}/log.html`);
+  await send(`⚖️ <b>ميعاد الوزن الأسبوعي</b>\nبكرة الصبح على الريق، بعد الحمام وقبل الأكل.`,
+    new InlineKeyboard().url('⚖️ سجّل الوزن', `${SITE}/log.html`), 'weigh');
   await pushAll('ميعاد الوزن ⚖️', 'سجّلوا وزنكم الأسبوعي', '/log.html');
 }
 
@@ -88,7 +106,16 @@ export async function sendWeeklyReport() {
       + `متوسط المية: ${(water.s / 7 / 1000).toFixed(1)} لتر/يوم · النوم: ${sleep.a ? sleep.a.toFixed(1) : '—'} ساعة\n`
       + `سعرات الأسبوع الجاي: ${tg.kcal} · الوصول المتوقع: ${tg.etaDate ? formatDateAr(tg.etaDate) : '—'}\n`;
   }
-  await send(t);
+  await send(t, new InlineKeyboard().url('📈 التقرير الكامل', `${SITE}/history.html`), 'report');
+}
+
+/** بعد الساعة 9 بالليل: لو كروت بكرة متبعتتش، ابعتها */
+export async function catchUpCards() {
+  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Kuwait', hour: '2-digit', hour12: false }).format(new Date()));
+  if (h < 21) return;
+  const since = new Date(Date.now() - (h - 21 + 1) * 3600000).toISOString();
+  const sent = sqlite.prepare("SELECT 1 FROM notify_log WHERE kind='cards' AND ok=1 AND at >= ?").get(since);
+  if (!sent) await sendTomorrowCards();
 }
 
 export function startBot() {
@@ -100,7 +127,16 @@ export function startBot() {
       return;
     }
     setSetting('telegram_chat_id', String(ctx.chat.id));
-    await ctx.reply('تمام ✅ الجروب ده اتسجّل. هبعت هنا كروت الأكل كل يوم الساعة 9 بالليل، والمكونات الساعة 5 الفجر و12 الضهر و5 المغرب.');
+    setSetting('telegram_chat_title', ctx.chat.title || 'الجروب');
+    logNotify('register', true, `اتسجّل الجروب: ${ctx.chat.title || ctx.chat.id}`);
+    await ctx.reply('تمام ✅ الجروب ده اتسجّل.\n\n🕘 9 بالليل: كروت أكل بكرة\n🌅 5 الفجر: مكونات الفطار\n☀️ 12 الضهر: مكونات الغدا\n🌙 5 المغرب: مكونات العشا\n⚖️ الجمعة 9م: تذكير الوزن\n📊 السبت 12ظ: تقرير الأسبوع',
+      { reply_markup: new InlineKeyboard().url('📱 افتح الموقع', SITE) });
+    await catchUpCards();
+  });
+
+  bot.command('status', async (ctx) => {
+    const lines = getProfiles().map((p) => { const t = targetsFor(p); return `${p.id === 'waleed' ? '🟢' : '🌸'} ${p.name}: ${t.weight} كجم · فاضل ${t.remainingKg} · ${t.kcal} سعر`; });
+    await ctx.reply(`📊 الحالة النهارده\n${lines.join('\n')}`, { reply_markup: new InlineKeyboard().url('📱 الداشبورد', SITE) });
   });
 
   bot.command('menu', async (ctx) => {
@@ -122,7 +158,16 @@ export function startBot() {
   });
 
   bot.catch((e) => console.error('[bot]', e.message));
-  bot.start({ onStart: (me) => console.log(`[bot] @${me.username} running`) }).catch((e) => console.error('[bot] start failed', e.message));
+  bot.api.setMyCommands([
+    { command: 'start', description: 'تسجيل الجروب لاستقبال الإشعارات' },
+    { command: 'menu', description: 'منيو النهارده' },
+    { command: 'tomorrow', description: 'ابعت كروت بكرة دلوقتي' },
+    { command: 'status', description: 'الوزن والسعرات النهارده' },
+  ]).catch(() => {});
+  // زرار القائمة في الشات الخاص بيفتح الموقع جوه التليجرام
+  bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'التطبيق', web_app: { url: SITE } } }).catch(() => {});
+
+  bot.start({ onStart: (me) => { botUsername = me.username; console.log(`[bot] @${me.username} running`); } }).catch((e) => console.error('[bot] start failed', e.message));
 }
 
 export { getPlan };

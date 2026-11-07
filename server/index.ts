@@ -7,8 +7,8 @@ import { seed } from './seed.js';
 import { getProfiles, getProfile, targetsFor, portionFor } from './nutrition.js';
 import { getPlan, generatePlan, getPlanById, choose, regenerateSlot } from './planner.js';
 import { todayKW, addDays } from './time.js';
-import { startBot, sendTomorrowCards, sendIngredients, sendWeeklyReport } from './bot.js';
-import { startScheduler } from './scheduler.js';
+import { startBot, sendTomorrowCards, sendIngredients, sendWeeklyReport, sendWeighReminder, telegramStatus } from './bot.js';
+import { startScheduler, SCHEDULE } from './scheduler.js';
 import { pushEnabled, saveSubscription, pushAll } from './notify.js';
 import type { Slot } from '../shared/types.js';
 import { SLOTS } from '../shared/types.js';
@@ -178,12 +178,16 @@ app.get('/api/history', (c) => {
 
 // ---------- push & telegram tests ----------
 app.post('/api/push/subscribe', async (c) => { saveSubscription(await c.req.json()); return c.json({ ok: true }); });
+app.get('/api/telegram/status', (c) => c.json({ ...telegramStatus(), schedule: SCHEDULE }));
 app.post('/api/test/:what', async (c) => {
   const w = c.req.param('what');
   if (w === 'cards') await sendTomorrowCards();
   else if (w === 'breakfast' || w === 'lunch' || w === 'dinner') await sendIngredients(w);
   else if (w === 'report') await sendWeeklyReport();
+  else if (w === 'weigh') await sendWeighReminder();
   else if (w === 'push') await pushAll('تجربة إشعار ✅', 'الإشعارات شغالة');
+  const st = telegramStatus();
+  if (w !== 'push' && !st.chatId) return c.json({ error: 'الجروب مش متسجّل — ضيف البوت للجروب واكتب /start' }, 400);
   return c.json({ ok: true });
 });
 

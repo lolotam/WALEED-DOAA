@@ -2,6 +2,7 @@ import { sqlite } from './db.js';
 
 /** بيانات البداية — تتكتب مرة واحدة بس لو قاعدة البيانات فاضية */
 export function seed() {
+  migrate();
   const has = sqlite.prepare('SELECT COUNT(*) AS n FROM profiles').get() as { n: number };
   if (has.n > 0) return;
 
@@ -14,9 +15,9 @@ export function seed() {
     startWeight: 94, startDate: '2026-11-07', goalWeight: 82, activityFactor: 1.2, bodyFatPct: null,
     waterGoalMl: 2500, color: '#14B8A6', avoidChicken: 0,
   });
-  // تقرير InBody بتاريخ 2026-11-07: السن 36 — تاريخ الميلاد تقريبي ويتعدل من الإعدادات
+  // تقرير InBody بتاريخ 2026-11-07
   insP.run({
-    id: 'doaa', name: 'دعاء', sex: 'female', birthDate: '1990-01-01', heightCm: 164,
+    id: 'doaa', name: 'دعاء', sex: 'female', birthDate: '1989-11-26', heightCm: 164,
     startWeight: 93.6, startDate: '2026-11-07', goalWeight: 70, activityFactor: 1.375, bodyFatPct: 45.9,
     waterGoalMl: 2500, color: '#F472B6', avoidChicken: 1,
   });
@@ -37,4 +38,14 @@ export function seed() {
   };
   const insPantry = sqlite.prepare('INSERT INTO pantry(name,category,available) VALUES (?,?,1)');
   for (const [cat, items] of Object.entries(pantry)) for (const it of items) insPantry.run(it, cat);
+}
+
+/** تعديلات بيانات بتتنفذ مرة واحدة */
+function migrate() {
+  const done = (k: string) => (sqlite.prepare('SELECT 1 FROM settings WHERE key=?').get(`mig:${k}`) ? true : false);
+  const mark = (k: string) => sqlite.prepare('INSERT OR IGNORE INTO settings(key,value) VALUES (?,?)').run(`mig:${k}`, new Date().toISOString());
+  if (!done('doaa-birthdate')) {
+    sqlite.prepare("UPDATE profiles SET birth_date='1989-11-26' WHERE id='doaa'").run();
+    mark('doaa-birthdate');
+  }
 }

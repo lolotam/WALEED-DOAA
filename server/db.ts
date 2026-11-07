@@ -104,6 +104,8 @@ CREATE TABLE IF NOT EXISTS meal_plans (
   eaten INTEGER NOT NULL DEFAULT 0, UNIQUE(date, slot));
 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS push_subs (endpoint TEXT PRIMARY KEY, json TEXT NOT NULL);
+CREATE TABLE IF NOT EXISTS notify_log (
+  id INTEGER PRIMARY KEY AUTOINCREMENT, at TEXT NOT NULL, kind TEXT NOT NULL, ok INTEGER NOT NULL, detail TEXT);
 CREATE INDEX IF NOT EXISTS idx_weights ON weights(profile_id, date);
 CREATE INDEX IF NOT EXISTS idx_water ON water(profile_id, date);
 CREATE INDEX IF NOT EXISTS idx_sleep ON sleep(profile_id, date);
@@ -117,4 +119,9 @@ export function getSetting(key: string): string | null {
 }
 export function setSetting(key: string, value: string) {
   sqlite.prepare('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=excluded.value').run(key, value);
+}
+
+export function logNotify(kind: string, ok: boolean, detail = '') {
+  sqlite.prepare('INSERT INTO notify_log(at,kind,ok,detail) VALUES (?,?,?,?)').run(new Date().toISOString(), kind, ok ? 1 : 0, detail.slice(0, 300));
+  sqlite.prepare('DELETE FROM notify_log WHERE id NOT IN (SELECT id FROM notify_log ORDER BY id DESC LIMIT 200)').run();
 }
