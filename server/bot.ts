@@ -6,7 +6,7 @@ import { todayKW, addDays, formatDateAr } from './time.js';
 import { SLOT_AR, DRINKS, type DrinkCode } from '../shared/types.js';
 import { pushAll } from './notify.js';
 import { getSchedule } from './scheduler.js';
-import { imageFor } from './meal-images.js';
+import { absoluteImageFor } from './meal-images.js';
 
 const token = process.env.TELEGRAM_BOT_TOKEN;
 export const bot = token ? new Bot(token) : null;
@@ -97,7 +97,7 @@ export async function sendIngredients(slot: 'breakfast' | 'lunch' | 'dinner') {
     for (const l of portion.lines) if (l.grams) t += `  ◦ ${esc(l.name)}: ${l.grams} جم\n`;
   }
   t += `\n👩‍🍳 <b>الطريقة:</b>\n` + opt.steps.map((s, i) => `${i + 1}. ${esc(s)}`).join('\n');
-  const img = imageFor(opt.title);
+  const img = absoluteImageFor(opt.title, SITE);
   if (img && bot && chatId()) {
     try { await bot.api.sendPhoto(chatId()!, img, { caption: `${slotAr}: ${opt.title}` }); } catch (e) { logNotify('photo', false, (e as Error).message); }
   }
