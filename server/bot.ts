@@ -137,18 +137,40 @@ export async function catchUpCards() {
 export function startBot() {
   if (!bot) { console.log('[bot] TELEGRAM_BOT_TOKEN missing — bot disabled'); return; }
 
-  bot.command(['start', 'register'], async (ctx) => {
-    if (ctx.chat.type === 'private') {
-      await ctx.reply('ضيفني في جروب البيت واكتب /start هناك علشان أبعت الكروت فيه.');
-      return;
-    }
-    setSetting('telegram_chat_id', String(ctx.chat.id));
-    setSetting('telegram_chat_title', ctx.chat.title || 'الجروب');
-    logNotify('register', true, `اتسجّل الجروب: ${ctx.chat.title || ctx.chat.id}`);
-    await ctx.reply('تمام ✅ الجروب ده اتسجّل.\n\n🕘 9 بالليل: كروت أكل بكرة\n🌅 5 الفجر: مكونات الفطار\n☀️ 12 الضهر: مكونات الغدا\n🌙 5 المغرب: مكونات العشا\n⚖️ الجمعة 9م: تذكير الوزن\n📊 السبت 12ظ: تقرير الأسبوع',
+  // كل تحديث بيوصل للبوت بيتسجّل (علشان نعرف من الموقع إن البوت شايف الرسايل)
+  bot.use(async (ctx, next) => {
+    const kind = ctx.callbackQuery ? 'زرار' : ctx.myChatMember ? 'إضافة/إزالة البوت' : ctx.message?.text ? `رسالة: ${ctx.message.text.slice(0, 40)}` : 'تحديث';
+    logNotify('incoming', true, `${kind} — ${ctx.chat?.type ?? ''} ${ctx.chat && 'title' in ctx.chat ? ctx.chat.title : ''} (${ctx.chat?.id ?? ''})`);
+    await next();
+  });
+
+  async function register(chat: { id: number; type: string; title?: string; first_name?: string }, reply: (t: string, o?: any) => Promise<unknown>) {
+    setSetting('telegram_chat_id', String(chat.id));
+    setSetting('telegram_chat_title', chat.title || chat.first_name || 'الشات');
+    logNotify('register', true, `اتسجّل: ${chat.title || chat.first_name || chat.id}`);
+    await reply('تمام ✅ الشات ده اتسجّل وهبعت فيه كل الإشعارات.\n\n🕘 9 بالليل: كروت أكل بكرة\n🌅 5 الفجر: مكونات الفطار\n☀️ 12 الضهر: مكونات الغدا\n🌙 5 المغرب: مكونات العشا\n⚖️ الجمعة 9م: تذكير الوزن\n📊 السبت 12ظ: تقرير الأسبوع',
       { reply_markup: new InlineKeyboard().url('📱 افتح الموقع', SITE) });
     await catchUpCards();
+  }
+
+  // أول ما البوت يتضاف لجروب، يسجّله لوحده (من غير /start)
+  bot.on('my_chat_member', async (ctx) => {
+    const st = ctx.myChatMember.new_chat_member.status;
+    if ((st === 'member' || st === 'administrator') && ctx.chat.type !== 'private') {
+      await register(ctx.chat as any, (t, o) => ctx.api.sendMessage(ctx.chat.id, t, o));
+    }
   });
+
+  bot.command(['start', 'register'], async (ctx) => {
+    // في الخاص: يتسجّل بس لو مفيش جروب متسجّل
+    if (ctx.chat.type === 'private' && chatId() && chatId() !== String(ctx.chat.id)) {
+      await ctx.reply(`الإشعارات متسجّلة على "${getSetting('telegram_chat_title') || 'الجروب'}". لو عايزها هنا، اكتب /register_here`);
+      return;
+    }
+    await register(ctx.chat as any, (t, o) => ctx.reply(t, o));
+  });
+
+  bot.command('register_here', async (ctx) => { await register(ctx.chat as any, (t, o) => ctx.reply(t, o)); });
 
   bot.command('status', async (ctx) => {
     const lines = getProfiles().map((p) => { const t = targetsFor(p); return `${p.id === 'waleed' ? '🟢' : '🌸'} ${p.name}: ${t.weight} كجم · فاضل ${t.remainingKg} · ${t.kcal} سعر`; });
@@ -181,7 +203,7 @@ export function startBot() {
     try { await ctx.editMessageText(cardText(updated), { parse_mode: 'HTML', reply_markup: cardKeyboard(updated) }); } catch { /* نفس النص */ }
   });
 
-  bot.catch((e) => console.error('[bot]', e.message));
+  bot.catch((e) => { console.error('[bot]', e.message); logNotify('bot-error', false, e.message); });
   bot.api.setMyCommands([
     { command: 'start', description: 'تسجيل الجروب لاستقبال الإشعارات' },
     { command: 'menu', description: 'منيو النهارده' },
@@ -191,7 +213,11 @@ export function startBot() {
   // زرار القائمة في الشات الخاص بيفتح الموقع جوه التليجرام
   bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'التطبيق', web_app: { url: SITE } } }).catch(() => {});
 
-  bot.start({ onStart: (me) => { botUsername = me.username; console.log(`[bot] @${me.username} running`); } }).catch((e) => console.error('[bot] start failed', e.message));
+  bot.start({
+    allowed_updates: ['message', 'callback_query', 'my_chat_member'],
+    drop_pending_updates: false,
+    onStart: (me) => { botUsername = me.username; console.log(`[bot] @${me.username} running`); logNotify('bot', true, `@${me.username} شغال`); },
+  }).catch((e) => { console.error('[bot] start failed', e.message); logNotify('bot-error', false, `البوت وقف: ${e.message}`); });
 }
 
 export { getPlan };

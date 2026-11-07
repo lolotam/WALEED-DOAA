@@ -57,7 +57,7 @@ function telegramCard(tg: any) {
   const fmt = (iso: string) => new Date(iso).toLocaleString('ar-EG', { timeZone: 'Asia/Kuwait', weekday: 'short', hour: 'numeric', minute: '2-digit' });
   return `<div class="card">
     <div class="slot-head"><h3 style="margin:0">🤖 بوت التليجرام ${tg.botUsername ? `<a class="muted small" href="https://t.me/${esc(tg.botUsername)}" target="_blank">@${esc(tg.botUsername)}</a>` : ''}</h3>${status}</div>
-    ${tg.chatId ? '' : `<p class="small" style="margin-bottom:12px">ضيف البوت للجروب واكتب <b>/start</b> هناك، وبعدها حدّث الصفحة دي.</p>`}
+    ${tg.chatId ? '' : `<p class="small" style="margin-bottom:12px">ضيف البوت للجروب (هيتسجّل لوحده)، أو ابعتله <b>/start</b> في الخاص. وبعدها حدّث الصفحة. لو مفيش ولا "incoming" في السجل تحت، يبقى الرسايل مش واصلة للبوت.</p>`}
     <div style="overflow-x:auto"><table class="table">
       <thead><tr><th>الرسالة</th><th>الميعاد</th><th>الأيام</th><th></th></tr></thead>
       <tbody>${tg.schedule.map((s: any) => `<tr><td>${esc(s.label)}</td><td>${s.time}</td><td class="muted">${s.days}</td>
