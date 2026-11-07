@@ -171,7 +171,9 @@ export function startBot() {
   // أول ما البوت يتضاف لجروب، يسجّله لوحده (من غير /start)
   bot.on('my_chat_member', async (ctx) => {
     const st = ctx.myChatMember.new_chat_member.status;
-    if ((st === 'member' || st === 'administrator') && ctx.chat.type !== 'private') {
+    if (st !== 'member' && st !== 'administrator') return;
+    // جروب: يتسجّل على طول. خاص: يتسجّل بس لو مفيش حاجة متسجّلة
+    if (ctx.chat.type !== 'private' || !chatId()) {
       await register(ctx.chat as any, (t, o) => ctx.api.sendMessage(ctx.chat.id, t, o));
     }
   });
@@ -228,11 +230,18 @@ export function startBot() {
   // زرار القائمة في الشات الخاص بيفتح الموقع جوه التليجرام
   bot.api.setChatMenuButton({ menu_button: { type: 'web_app', text: 'التطبيق', web_app: { url: SITE } } }).catch(() => {});
 
-  bot.start({
-    allowed_updates: ['message', 'callback_query', 'my_chat_member'],
-    drop_pending_updates: false,
-    onStart: (me) => { botUsername = me.username; console.log(`[bot] @${me.username} running`); logNotify('bot', true, `@${me.username} شغال`); },
-  }).catch((e) => { console.error('[bot] start failed', e.message); logNotify('bot-error', false, `البوت وقف: ${e.message}`); });
+  // لو حصل تعارض (409) وقت النشر لما نسختين بيشتغلوا مع بعض، يحاول تاني لوحده
+  const run = (attempt = 1) => {
+    bot!.start({
+      allowed_updates: ['message', 'callback_query', 'my_chat_member'],
+      onStart: (me) => { botUsername = me.username; console.log(`[bot] @${me.username} running`); logNotify('bot', true, `@${me.username} شغال`); },
+    }).catch((e) => {
+      console.error('[bot] polling stopped', e.message);
+      logNotify('bot-error', false, `البوت وقف وهيرجع بعد ${Math.min(60, 5 * attempt)} ثانية: ${e.message}`);
+      setTimeout(() => run(attempt + 1), Math.min(60, 5 * attempt) * 1000);
+    });
+  };
+  run();
 }
 
 export { getPlan };
